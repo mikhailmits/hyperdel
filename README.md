@@ -90,7 +90,8 @@ require("hyperdel").setup({
 - `api_id`, `api_hash`: can also come from `HYPERDEL_API_ID` and `HYPERDEL_API_HASH`.
 - `targets`: names you can pass to `:Hyperdel`. A value is `"saved"` (your Saved Messages), a public `"@username"`, or a numeric chat id. A raw `@username` or chat id also works as the command argument.
 - `after_delivery`: `"keep"` leaves the text, `"clear"` removes the delivered lines, `"close"` deletes the buffer. Nothing happens if the buffer was edited while delivering.
-- `on_delivered`: `function(info)` called after a successful delivery with `{ target, chat, bufnr, text, messages }`. Use it for custom actions such as closing a terminal tab.
+- `on_delivered`: `function(info)` called after a successful delivery with `{ target, chat, bufnr, text, messages, line1, cleared, view }`. `cleared` is true when `after_delivery = "clear"` removed the text, and `view` holds the window it was shown in (`win`, `topline`, `textoff`, `leftcol`). Use it for custom actions such as closing a terminal tab.
+- `require("hyperdel.animation").collapse`: a ready-made `on_delivered` for `after_delivery = "clear"`. The delivered letters gather in the middle of the window and fall to the bottom, where they disappear.
 - `keymap`: a key for normal mode (whole buffer) and visual mode (selection). No key is mapped by default.
 - `log_level`: TDLib log verbosity. Logs go to `data_dir/tdlib.log`, never to the screen.
 

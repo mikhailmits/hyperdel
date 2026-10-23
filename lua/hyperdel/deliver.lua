@@ -4,6 +4,16 @@ local telegram = require("hyperdel.telegram")
 
 local M = {}
 
+local function view(bufnr)
+	local win = vim.api.nvim_get_current_buf() == bufnr and vim.api.nvim_get_current_win() or vim.fn.bufwinid(bufnr)
+	if win == -1 then
+		return nil
+	end
+	local info = vim.fn.getwininfo(win)[1]
+	local leftcol = vim.api.nvim_win_call(win, vim.fn.winsaveview).leftcol
+	return { win = win, topline = info.topline, textoff = info.textoff, leftcol = leftcol }
+end
+
 local function after(cfg, bufnr, line1, line2, tick)
 	if cfg.after_delivery == "keep" or not vim.api.nvim_buf_is_valid(bufnr) then
 		return
@@ -12,10 +22,11 @@ local function after(cfg, bufnr, line1, line2, tick)
 		return nvim.warn("buffer changed during delivery, text kept")
 	end
 	if cfg.after_delivery == "clear" then
+		local shown = view(bufnr)
 		nvim.clear(bufnr, line1, line2)
-	else
-		nvim.close(bufnr)
+		return true, shown
 	end
+	nvim.close(bufnr)
 end
 
 function M.deliver(opts)
@@ -36,9 +47,18 @@ function M.deliver(opts)
 			return nvim.error("delivery to " .. name .. " failed" .. partial .. ": " .. err)
 		end
 		nvim.notify(string.format("delivered to %s (%d message%s)", name, sent, sent == 1 and "" or "s"))
-		after(cfg, bufnr, line1, line2, tick)
+		local cleared, shown = after(cfg, bufnr, line1, line2, tick)
 		if cfg.on_delivered then
-			cfg.on_delivered({ target = name, chat = target, bufnr = bufnr, text = text, messages = sent })
+			cfg.on_delivered({
+				target = name,
+				chat = target,
+				bufnr = bufnr,
+				text = text,
+				messages = sent,
+				line1 = line1,
+				cleared = cleared == true,
+				view = shown,
+			})
 		end
 	end)
 end
