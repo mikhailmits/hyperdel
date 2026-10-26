@@ -1,5 +1,7 @@
 # hyperdel
 
+![assets/demo.mp4]
+
 Deliver your thoughts to anywhere (currently only to Telegram) from Neovim.
 
 ## Quick Usage Guide
