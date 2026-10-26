@@ -6,6 +6,7 @@ Deliver your thoughts to anywhere (currently only to Telegram) from Neovim.
 In nvim command-line run `:HyperdelSetup` if you've just installed the plugin.
 
 In order to publish your neovim selection/whole window to Saved messages run the next in nvim command-line mode: `hy saved`.
+Or just press `<leader>hy`
 
 You may configure the `hy <target>` targets in order to specify where to publish your nvim buffer, see the Configuration section below.
 
