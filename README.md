@@ -1,6 +1,7 @@
 # hyperdel
 
-https://github.com/user-attachments/assets/cd06bcfe-0c46-4e6f-95d9-fda7eda8b216
+![hyperdel demo](assets/demo.gif)
+
 Deliver your thoughts to anywhere (currently only to Telegram) from Neovim.
 
 ## Quick Usage Guide
