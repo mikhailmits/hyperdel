@@ -16,6 +16,17 @@ local function decode(raw)
 	return vim.json.decode(ffi.string(raw))
 end
 
+local function failure(message)
+	return { ["@type"] = "error", message = message }
+end
+
+local function protect(fn, ...)
+	local ok, err = pcall(fn, ...)
+	if not ok then
+		vim.notify("hyperdel: " .. tostring(err), vim.log.levels.ERROR)
+	end
+end
+
 local function dispatch(event)
 	local extra = event["@extra"]
 	local cb = extra ~= nil and callbacks[extra]
@@ -36,11 +47,17 @@ local function poll()
 		end
 		local event = decode(raw)
 		if event["@client_id"] == nil or event["@client_id"] == client_id then
-			local ok, err = pcall(dispatch, event)
-			if not ok then
-				vim.notify("hyperdel: " .. tostring(err), vim.log.levels.ERROR)
-			end
+			protect(dispatch, event)
 		end
+	end
+end
+
+local function expire(extra, message)
+	poll()
+	local cb = callbacks[extra]
+	if cb then
+		callbacks[extra] = nil
+		protect(cb, failure(message))
 	end
 end
 
@@ -85,14 +102,30 @@ function M.reset()
 		timer = nil
 	end
 	client_id = nil
+	local list = callbacks
 	callbacks = {}
+	for _, cb in pairs(list) do
+		protect(cb, failure("telegram client closed"))
+	end
 end
 
-function M.send(request, cb)
+function M.send(request, cb, timeout)
+	if not client_id then
+		if cb then
+			cb(failure("telegram client closed"))
+		end
+		return
+	end
 	if cb then
 		next_extra = next_extra + 1
-		request["@extra"] = next_extra
-		callbacks[next_extra] = cb
+		local extra = next_extra
+		request["@extra"] = extra
+		callbacks[extra] = cb
+		if timeout then
+			vim.defer_fn(function()
+				expire(extra, string.format("%s timed out after %ds", request["@type"], timeout / 1000))
+			end, timeout)
+		end
 	end
 	lib.td_send(client_id, vim.json.encode(request))
 end

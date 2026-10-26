@@ -8,6 +8,8 @@ local M = {}
 
 M.version = "0.1.0"
 
+local timeouts = { offline = 2000, network = 10000, confirm = 30000 }
+
 local state
 local intent
 local registered = false
@@ -37,7 +39,7 @@ local function ask(name, label, read, build)
 				return flush("login cancelled")
 			end
 			client.send(build(value), function(res)
-				if is_error(res) then
+				if is_error(res) and client.running() then
 					nvim.error(res.message)
 					prompts[name]()
 				end
@@ -94,6 +96,15 @@ local function set_parameters()
 	end)
 end
 
+local function fail_pending(err)
+	local list = pending
+	pending = {}
+	early = {}
+	for _, cb in pairs(list) do
+		cb(err)
+	end
+end
+
 local function log_out()
 	intent = "logging_out"
 	client.send({ ["@type"] = "logOut" })
@@ -113,16 +124,18 @@ local function on_auth_state(update)
 		state = nil
 		chat_ids = {}
 		if intent == "logging_out" then
-			intent = nil
 			nvim.notify("logged out")
 		end
+		intent = nil
+		fail_pending("telegram client closed")
 		return flush("telegram client closed")
 	elseif state == "authorizationStateLoggingOut" or state == "authorizationStateClosing" then
 		return
 	end
 	if intent == "logout" then
 		intent = nil
-		return nvim.notify("not logged in")
+		nvim.notify("not logged in")
+		return flush("not logged in")
 	end
 	if not prompts[state] then
 		return flush("unsupported login step " .. state)
@@ -211,7 +224,7 @@ local function load_chats(list, cb)
 			return cb()
 		end
 		load_chats(list, cb)
-	end)
+	end, timeouts.network)
 end
 
 local function get_chat(chat_id, cb, retried)
@@ -227,7 +240,7 @@ local function get_chat(chat_id, cb, retried)
 				get_chat(chat_id, cb, true)
 			end)
 		end)
-	end)
+	end, timeouts.offline)
 end
 
 local function resolve(target, cb)
@@ -250,15 +263,15 @@ local function resolve(target, cb)
 					return done(nil, chat.message)
 				end
 				done(chat.id)
-			end)
-		end)
+			end, timeouts.offline)
+		end, timeouts.offline)
 	elseif type(target) == "string" and target:sub(1, 1) == "@" then
 		client.send({ ["@type"] = "searchPublicChat", username = target:sub(2) }, function(chat)
 			if is_error(chat) then
 				return done(nil, target .. ": " .. chat.message)
 			end
 			done(chat.id)
-		end)
+		end, timeouts.network)
 	elseif tonumber(target) then
 		get_chat(tonumber(target), done)
 	else
@@ -287,7 +300,13 @@ local function send_text(chat_id, text, cb)
 			return cb(err or nil)
 		end
 		pending[message.id] = cb
-	end)
+		vim.defer_fn(function()
+			if pending[message.id] == cb then
+				pending[message.id] = nil
+				cb(string.format("not confirmed after %ds, it may still be delivered", timeouts.confirm / 1000))
+			end
+		end, timeouts.confirm)
+	end, timeouts.offline)
 end
 
 function M.text_limit()
@@ -338,7 +357,7 @@ function M.login(cb)
 				return cb(me.message)
 			end
 			cb(nil, me)
-		end)
+		end, timeouts.offline)
 	end)
 end
 
@@ -346,6 +365,9 @@ function M.logout()
 	if client.running() then
 		if state == "authorizationStateReady" then
 			return log_out()
+		elseif state == "authorizationStateLoggingOut" or state == "authorizationStateClosing" then
+			intent = "logging_out"
+			return
 		elseif prompts[state] then
 			return nvim.notify("not logged in")
 		end

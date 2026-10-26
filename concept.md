@@ -10,9 +10,6 @@ start writing in any folder, just in nvim, when finished just write some
 command/press binding and done.
 
 open questions:
-- plugin compatibility with older nvim
-- how to design the command
-- should the text be eraised from editor after delivery?
 -- I think we can configure it, we even may interact with rex api, if the terminal is rex to kill the tab
 with cool animations or just erase text.
 - how to deliver it to github as a real plugin
@@ -22,6 +19,8 @@ decisions:
 - we'll use lua module version of tdlib 
 - make the plugin manager install tdlib deps on installation
 - build lua client for tdlib_json
+- on clear,close after_delivery type -> play anim of "rock" to the ground.
+- on close a_d -> play anim -> close nvim
 
 This file may not be touched by AI agents.
 

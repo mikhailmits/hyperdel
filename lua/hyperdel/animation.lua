@@ -18,57 +18,10 @@ local function ease(t)
 	return 1 + f * f * f / 2
 end
 
-local function glyphs(line, tabstop)
-	local list, col = {}, 0
-	for _, ch in ipairs(vim.fn.split(line, "\\zs")) do
-		if ch == "\t" then
-			col = col + tabstop - col % tabstop
-		else
-			local w = ch:match("^[ -~]$") and 1 or vim.fn.strdisplaywidth(ch)
-			if ch:match("%S") then
-				table.insert(list, { ch = ch, col = col, w = w })
-			end
-			col = col + w
-		end
-	end
-	return list, col
-end
-
-local function rows_of(cols, width, wrap)
-	if not wrap or cols <= width then
-		return 1
-	end
-	return math.ceil(cols / width)
-end
-
-local function particles(ctx, width, height)
-	local view = ctx.view
-	local tabstop = vim.bo[ctx.bufnr].tabstop
-	local wrap = vim.wo[view.win].wrap
-	local row = 0
-	if ctx.line1 > view.topline then
-		for _, line in ipairs(vim.api.nvim_buf_get_lines(ctx.bufnr, view.topline - 1, ctx.line1 - 1, false)) do
-			local _, cols = glyphs(line, tabstop)
-			row = row + rows_of(cols, width, wrap)
-		end
-	end
+local function particles(view)
 	local list = {}
-	local lines = vim.split(ctx.text, "\n", { plain = true })
-	for i = math.max(1, view.topline - ctx.line1 + 1), #lines do
-		if row >= height then
-			break
-		end
-		local chars, cols = glyphs(lines[i], tabstop)
-		for _, g in ipairs(chars) do
-			local r, c = row, g.col - view.leftcol
-			if wrap then
-				r, c = row + math.floor(g.col / width), g.col % width
-			end
-			if r < height and c >= 0 and c + g.w <= width then
-				table.insert(list, { ch = g.ch, w = g.w, x0 = c, y0 = r, x = c, y = r })
-			end
-		end
-		row = row + rows_of(cols, width, wrap)
+	for _, cell in ipairs(view.cells) do
+		table.insert(list, { ch = cell.ch, w = cell.w, x0 = cell.col, y0 = cell.row, x = cell.col, y = cell.row })
 	end
 	return list
 end
@@ -136,20 +89,13 @@ local function render(list, width, height)
 	return lines
 end
 
-function M.collapse(ctx)
+local function play(ctx, still, finish)
 	local view = ctx.view
-	if not ctx.cleared or not view or not vim.api.nvim_win_is_valid(view.win) then
-		return
+	if not view or #view.cells == 0 or not vim.api.nvim_win_is_valid(view.win) then
+		return finish()
 	end
-	local width = vim.api.nvim_win_get_width(view.win) - view.textoff
-	local height = vim.api.nvim_win_get_height(view.win)
-	if width < 1 or height < 1 then
-		return
-	end
-	local list = particles(ctx, width, height)
-	if #list == 0 then
-		return
-	end
+	local width, height = view.width, view.height
+	local list = particles(view)
 	aim(list, width, height)
 
 	local buf = vim.api.nvim_create_buf(false, true)
@@ -159,7 +105,7 @@ function M.collapse(ctx)
 	local float = vim.api.nvim_open_win(buf, false, {
 		relative = "win",
 		win = view.win,
-		row = 0,
+		row = view.winbar,
 		col = view.textoff,
 		width = width,
 		height = height,
@@ -171,7 +117,6 @@ function M.collapse(ctx)
 	vim.wo[float].winblend = 100
 	vim.wo[float].winhighlight = "Normal:Normal,NormalFloat:Normal"
 
-	local tick = vim.api.nvim_buf_get_changedtick(ctx.bufnr)
 	local start = uv.hrtime()
 	local timer = uv.new_timer()
 	local done = false
@@ -182,6 +127,7 @@ function M.collapse(ctx)
 		if vim.api.nvim_win_is_valid(float) then
 			vim.api.nvim_win_close(float, true)
 		end
+		finish()
 	end
 	timer:start(
 		frame_ms,
@@ -190,11 +136,7 @@ function M.collapse(ctx)
 			if done then
 				return
 			end
-			if
-				not vim.api.nvim_win_is_valid(float)
-				or not vim.api.nvim_buf_is_valid(ctx.bufnr)
-				or vim.api.nvim_buf_get_changedtick(ctx.bufnr) ~= tick
-			then
+			if not vim.api.nvim_win_is_valid(float) or not still() then
 				return stop()
 			end
 			local t = (uv.hrtime() - start) / 1e6
@@ -209,6 +151,27 @@ function M.collapse(ctx)
 			vim.api.nvim_buf_set_lines(buf, 0, -1, false, render(list, width, height))
 		end)
 	)
+end
+
+function M.collapse(ctx)
+	if not ctx.cleared then
+		return
+	end
+	local tick = vim.api.nvim_buf_get_changedtick(ctx.bufnr)
+	play(ctx, function()
+		return vim.api.nvim_buf_is_valid(ctx.bufnr) and vim.api.nvim_buf_get_changedtick(ctx.bufnr) == tick
+	end, function() end)
+end
+
+function M.collapse_quit(ctx)
+	if not ctx.closed then
+		return
+	end
+	play(ctx, function()
+		return true
+	end, function()
+		vim.cmd("confirm qall")
+	end)
 end
 
 return M

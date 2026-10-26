@@ -4,14 +4,24 @@ local telegram = require("hyperdel.telegram")
 
 local M = {}
 
-local function view(bufnr)
+local function view(bufnr, line1, line2)
 	local win = vim.api.nvim_get_current_buf() == bufnr and vim.api.nvim_get_current_win() or vim.fn.bufwinid(bufnr)
 	if win == -1 then
 		return nil
 	end
+	vim.cmd("redraw")
 	local info = vim.fn.getwininfo(win)[1]
 	local leftcol = vim.api.nvim_win_call(win, vim.fn.winsaveview).leftcol
-	return { win = win, topline = info.topline, textoff = info.textoff, leftcol = leftcol }
+	return {
+		win = win,
+		topline = info.topline,
+		textoff = info.textoff,
+		leftcol = leftcol,
+		winbar = info.winbar or 0,
+		width = info.width - info.textoff,
+		height = info.height,
+		cells = nvim.cells(win, line1, line2),
+	}
 end
 
 local function after(cfg, bufnr, line1, line2, tick)
@@ -21,12 +31,13 @@ local function after(cfg, bufnr, line1, line2, tick)
 	if nvim.changedtick(bufnr) ~= tick then
 		return nvim.warn("buffer changed during delivery, text kept")
 	end
+	local shown = view(bufnr, line1, line2)
 	if cfg.after_delivery == "clear" then
-		local shown = view(bufnr)
 		nvim.clear(bufnr, line1, line2)
-		return true, shown
+	else
+		nvim.close(bufnr)
 	end
-	nvim.close(bufnr)
+	return cfg.after_delivery, shown
 end
 
 function M.deliver(opts)
@@ -46,8 +57,8 @@ function M.deliver(opts)
 			local partial = sent and sent > 0 and string.format(" after %d message(s)", sent) or ""
 			return nvim.error("delivery to " .. name .. " failed" .. partial .. ": " .. err)
 		end
-		nvim.notify(string.format("delivered to %s (%d message%s)", name, sent, sent == 1 and "" or "s"))
-		local cleared, shown = after(cfg, bufnr, line1, line2, tick)
+		nvim.brief(string.format("delivered to %s (%d message%s)", name, sent, sent == 1 and "" or "s"))
+		local done, shown = after(cfg, bufnr, line1, line2, tick)
 		if cfg.on_delivered then
 			cfg.on_delivered({
 				target = name,
@@ -56,7 +67,8 @@ function M.deliver(opts)
 				text = text,
 				messages = sent,
 				line1 = line1,
-				cleared = cleared == true,
+				cleared = done == "clear",
+				closed = done == "close",
 				view = shown,
 			})
 		end
