@@ -111,8 +111,30 @@ function M.clear(bufnr, line1, line2)
 	vim.api.nvim_buf_set_lines(bufnr, line1 - 1, line2, false, {})
 end
 
-function M.close(bufnr)
-	vim.api.nvim_buf_delete(bufnr, { force = true })
+function M.quit(bufnr)
+	if vim.api.nvim_buf_is_valid(bufnr) then
+		vim.api.nvim_buf_delete(bufnr, { force = true })
+	end
+	local session, block, leave = vim.env.REX_SESSION, vim.env.REX_BLOCK, nil
+	if session and block and vim.fn.executable("rex") == 1 then
+		leave = vim.api.nvim_create_autocmd("VimLeave", {
+			once = true,
+			callback = function()
+				vim.fn.jobstart({
+					"sh",
+					"-c",
+					'while kill -0 "$0" 2>/dev/null; do sleep 0.05; done; exec rex block close -s "$1" "$2"',
+					tostring(vim.fn.getpid()),
+					session,
+					block,
+				}, { detach = true })
+			end,
+		})
+	end
+	pcall(vim.cmd, "confirm qall")
+	if leave then
+		pcall(vim.api.nvim_del_autocmd, leave)
+	end
 end
 
 local function floats(win)

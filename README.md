@@ -74,12 +74,10 @@ require("hyperdel").setup({
     private = -1001234567890,    -- any chat, by id
   },
 
-  after_delivery = "keep", -- "keep" the text, "clear" it, or "close" the buffer
-  animation = true,        -- on "clear" and "close" the letters fall away first
-
-  -- runs after publishing and the animation, e.g. to quit nvim:
-  -- function() vim.cmd("confirm qall") end
-  on_delivered = nil,
+  -- "keep" the text, "clear" it, or "close" nvim (and its tab when running in Rex)
+  after_delivery = "keep",
+  animation = true, -- on "clear" and "close" the letters fall away first
+  on_delivered = nil, -- function(info) to run after publishing and the animation
 
   keymap = "<leader>hy", -- publishes buffer or selection to all targets; false = no key
   tdjson_path = nil,     -- path to your own libtdjson build

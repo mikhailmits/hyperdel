@@ -36,11 +36,7 @@ local function after(cfg, bufnr, line1, line2, tick, done)
 	local shown = view(bufnr, line1, line2)
 	nvim.clear(bufnr, line1, line2)
 	local function finish(untouched)
-		if cfg.after_delivery == "close" and untouched and vim.api.nvim_buf_is_valid(bufnr) then
-			nvim.close(bufnr)
-			return done("close", shown)
-		end
-		done("clear", shown)
+		done(cfg.after_delivery == "close" and untouched and "close" or "clear", shown)
 	end
 	if cfg.animation and shown then
 		return animation.play(shown, bufnr, finish)
@@ -93,6 +89,9 @@ function M.deliver(opts)
 					closed = done == "close",
 					view = shown,
 				})
+			end
+			if done == "close" then
+				nvim.quit(bufnr)
 			end
 		end)
 	end
