@@ -1,8 +1,7 @@
 # hyperdel
 
-![hyperdel demo](assets/demo.gif)
-
 Deliver your thoughts to anywhere (currently only to Telegram) from Neovim.
+![hyperdel demo](assets/demo.gif)
 
 ## Quick Usage Guide
 In nvim command-line run `:HyperdelSetup` if you've just installed the plugin.
