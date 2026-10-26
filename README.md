@@ -2,21 +2,12 @@
 
 Deliver your thoughts to anywhere (currently only to Telegram) from Neovim.
 
-## Usage
+## Quick Usage Guide
+In nvim command-line run `:HyperdelSetup` if you've just installed the plugin.
 
-| Command | What it does |
-|---|---|
-| `:hy saved` | Publish the buffer to your Saved Messages |
-| `:hy saved ideas -1001234567890` | Publish to several targets at once |
-| `:hy` or `<leader>hy` | Publish to every target in your config |
-| `:'<,'>hy` | Publish only the selected lines |
-| `:HyperdelSetup` | Install and log in |
-| `:HyperdelSetup!` | Reinstall and log in again |
-| `:HyperdelLogout` | Log out |
+In order to publish your neovim selection/whole window to Saved messages run the next in nvim command-line mode: `hy saved`.
 
-A target is a name from `targets`, `saved`, an `@username` or a chat id.
-
-Login asks for your phone number, the code Telegram sends you, and your 2FA password if you have one. You only log in once.
+You may configure the `hy <target>` targets in order to specify where to publish your nvim buffer, see the Configuration section below.
 
 ## Requirements
 
