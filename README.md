@@ -2,8 +2,21 @@
 
 Deliver your thoughts to anywhere (currently only to Telegram) from Neovim.
 
-
 ## Usage
+
+| Command | What it does |
+|---|---|
+| `:hy saved` | Publish the buffer to your Saved Messages |
+| `:hy saved ideas -1001234567890` | Publish to several targets at once |
+| `:hy` or `<leader>hy` | Publish to every target in your config |
+| `:'<,'>hy` | Publish only the selected lines |
+| `:HyperdelSetup` | Install and log in |
+| `:HyperdelSetup!` | Reinstall and log in again |
+| `:HyperdelLogout` | Log out |
+
+A target is a name from `targets`, `saved`, an `@username` or a chat id.
+
+Login asks for your phone number, the code Telegram sends you, and your 2FA password if you have one. You only log in once.
 
 ## Requirements
 
@@ -53,50 +66,32 @@ To use a TDLib you built yourself, set `tdjson_path` to the full path of `libtdj
 
 Check everything: `:checkhealth hyperdel`.
 
-## Usage examples
-
-| Command| Meaning |
-|---|---|
-| `:hy saved` | Publish the whole nvim buffer to your Saved Messages |
-| `:hy saved ideas -1001234567890` | Deliver to several targets (targets may be set in options |
-| `:hy` or `<leader>hy` | Publish everywhere you've set |
-| `:'<,'>hy [targets]` | Publish the selected lines |
-| `:HyperdelSetup` | Finish plugin installation and log in |
-| `:HyperdelSetup!` | Reinstall the plugin, log out and log in again |
-| `:HyperdelLogout` | Log out and end the Telegram session |
-
-`:hy` is shorthand for `:Hy`, which works too.
-
-Login asks for your phone number and the code Telegram sends you, additionally may ask for 2FA code if set. The session is stored in `stdpath("data")/hyperdel/tdlib`, so you log in once.
-
-Long notes are split into several messages at line boundaries. 
-
 ## Configuration
 
 ```lua
 require("hyperdel").setup({
-  api_id = nil,
-  api_hash = nil,
+  api_id = nil,   -- from https://my.telegram.org, or env HYPERDEL_API_ID
+  api_hash = nil, -- from https://my.telegram.org, or env HYPERDEL_API_HASH
+
+  -- where to publish; :hy or <leader>hy with no target publishes to all of them
+  -- your list replaces the default, which is only saved
   targets = {
-    saved = "saved",
-    ideas = "@my_ideas_channel",
-    private = -1001234567890,
+    saved = "saved",             -- your Saved Messages
+    ideas = "@my_ideas_channel", -- a public channel or user
+    private = -1001234567890,    -- any chat, by id
   },
-  after_delivery = "keep",
+
+  after_delivery = "keep", -- "keep" the text, "clear" it, or "close" the buffer
+
+  -- runs once every target got the text; ready-made animations:
+  -- require("hyperdel.animation").collapse       with "clear": letters fall away
+  -- require("hyperdel.animation").collapse_quit  with "close": same, then quits nvim
   on_delivered = nil,
-  keymap = "<leader>hy",
-  tdjson_path = nil,
-  data_dir = vim.fn.stdpath("data") .. "/hyperdel",
-  log_level = 1,
+
+  keymap = "<leader>hy", -- publishes buffer or selection to all targets; false = no key
+  tdjson_path = nil,     -- path to your own libtdjson build
+  data_dir = vim.fn.stdpath("data") .. "/hyperdel", -- login session and logs
+  log_level = 1,         -- TDLib log detail, saved to data_dir/tdlib.log
 })
 ```
-
-- `api_id`, `api_hash`: can also come from `HYPERDEL_API_ID` and `HYPERDEL_API_HASH`.
-- `targets`: names you can pass to `:hy`, and the list that `:hy` without arguments and the keymap deliver to. A value is `"saved"` (your Saved Messages), a public `"@username"`, or a numeric chat id. A raw `@username` or chat id also works as a command argument. Your table replaces the default `{ saved = "saved" }`, so add `saved` if you still want it.
-- `after_delivery`: `"keep"` leaves the text, `"clear"` removes the delivered lines, `"close"` deletes the buffer. Nothing happens if the buffer was edited while delivering.
-- `on_delivered`: `function(info)` called once after every target succeeded, with `{ targets, bufnr, text, line1, cleared, closed, view }`. `targets` lists each delivery as `{ name, chat, messages }`. `cleared` is true when `after_delivery = "clear"` removed the text, `closed` is true when `after_delivery = "close"` deleted the buffer, and `view` holds the window it was shown in (`win`, `topline`, `textoff`, `leftcol`, `winbar`, `width`, `height`) and `cells`, the delivered text exactly as it was drawn on screen, one `{ row, col, ch, w }` per character, relative to the text area. Use it for custom actions such as closing a terminal tab.
-- `require("hyperdel.animation").collapse`: a ready-made `on_delivered` for `after_delivery = "clear"`. The delivered letters gather in the middle of the window and fall to the bottom, where they disappear.
-- `require("hyperdel.animation").collapse_quit`: a ready-made `on_delivered` for `after_delivery = "close"`. It plays the same animation, then quits Neovim with `:confirm qall`, so other unsaved buffers are asked about instead of lost.
-- `keymap`: a key for normal mode (whole buffer) and visual mode (selection) that delivers to all targets. Set it to `false` to map nothing.
-- `log_level`: TDLib log verbosity. Logs go to `data_dir/tdlib.log`, never to the screen.
 
