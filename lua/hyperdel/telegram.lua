@@ -1,6 +1,7 @@
 local client = require("hyperdel.tdlib.client")
 local config = require("hyperdel.config")
 local nvim = require("hyperdel.nvim")
+local qr = require("hyperdel.qr")
 
 local uv = vim.uv or vim.loop
 
@@ -20,6 +21,7 @@ local options = {}
 local chat_ids = {}
 local prompts = {}
 local after_logout = {}
+local qr_link
 
 local function is_error(obj)
 	return obj["@type"] == "error"
@@ -49,13 +51,42 @@ local function ask(name, label, read, build)
 	end
 end
 
-ask("authorizationStateWaitPhoneNumber", "Telegram phone number: ", nvim.input, function(value)
-	return { ["@type"] = "setAuthenticationPhoneNumber", phone_number = value }
-end)
+local function or_qr(build)
+	return function(value)
+		if vim.trim(value):lower() == "qr" then
+			return { ["@type"] = "requestQrCodeAuthentication" }
+		end
+		return build(value)
+	end
+end
 
-ask("authorizationStateWaitCode", "Telegram login code: ", nvim.input, function(value)
-	return { ["@type"] = "checkAuthenticationCode", code = value }
-end)
+ask(
+	"authorizationStateWaitPhoneNumber",
+	"Telegram phone number (or type - qr): ",
+	nvim.input,
+	or_qr(function(value)
+		return { ["@type"] = "setAuthenticationPhoneNumber", phone_number = value }
+	end)
+)
+
+ask(
+	"authorizationStateWaitCode",
+	"Telegram login code (or type - qr): ",
+	nvim.input,
+	or_qr(function(value)
+		return { ["@type"] = "checkAuthenticationCode", code = value }
+	end)
+)
+
+prompts.authorizationStateWaitOtherDeviceConfirmation = function()
+	local lines = qr_link and qr.render(qr_link)
+	if not lines then
+		return flush("could not draw the QR code")
+	end
+	nvim.show_qr(lines, function()
+		flush("login cancelled")
+	end)
+end
 
 ask("authorizationStateWaitPassword", "Telegram password: ", nvim.secret, function(value)
 	return { ["@type"] = "checkAuthenticationPassword", password = value }
@@ -122,6 +153,11 @@ end
 
 local function on_auth_state(update)
 	state = update.authorization_state["@type"]
+	if state == "authorizationStateWaitOtherDeviceConfirmation" then
+		qr_link = update.authorization_state.link
+	else
+		nvim.close_qr()
+	end
 	if state == "authorizationStateWaitTdlibParameters" then
 		return set_parameters()
 	elseif state == "authorizationStateReady" then
@@ -400,6 +436,29 @@ function M.logout(cb)
 			nvim.error(err)
 		end
 	end
+end
+
+local function close()
+	client.close_sync(2000)
+	state = nil
+	chat_ids = {}
+	nvim.close_qr()
+	fail_pending("telegram client closed")
+	flush("telegram client closed")
+end
+
+function M.forget(cb)
+	M.logout(function()
+		if client.running() then
+			close()
+		end
+		client.execute({ ["@type"] = "setLogStream", log_stream = { ["@type"] = "logStreamEmpty" } })
+		local dir = config.get().data_dir
+		for _, name in ipairs({ "tdlib", "files", "tdlib.log" }) do
+			vim.fn.delete(dir .. "/" .. name, "rf")
+		end
+		cb()
+	end)
 end
 
 function M.state()

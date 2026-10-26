@@ -4,6 +4,7 @@ Deliver your thoughts to anywhere (currently only to Telegram) from Neovim.
 
 ## Quick Usage Guide
 In nvim command-line run `:HyperdelSetup` if you've just installed the plugin.
+To log in with a QR code instead, type `qr` when it asks for your phone number or login code.
 
 In order to publish your neovim selection/whole window to Saved messages run the next in nvim command-line mode: `hy saved`.
 Or just press `<leader>hy`.
@@ -52,7 +53,7 @@ Run :HyperdelSetup, once you've installed the plugin.
 ### Manually or with your own TDLib
 
 Run `:HyperdelSetup`.
-`:HyperdelSetup!` reinstalls the plugin and relogins to your telegram account, logs you out and logs you in again.
+`:HyperdelSetup!` reinstalls the plugin, logs you out, deletes the saved Telegram session and phone number, and logs you in again.
 
 To use a TDLib you built yourself, set `tdjson_path` to the full path of `libtdjson`.
 

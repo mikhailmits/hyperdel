@@ -30,6 +30,54 @@ function M.brief(msg)
 	vim.notify(msg, vim.log.levels.INFO)
 end
 
+local qr_win
+
+local function qr_config(lines)
+	local width = vim.fn.strdisplaywidth(lines[1])
+	return {
+		relative = "editor",
+		row = math.max(0, math.floor((vim.o.lines - #lines) / 2) - 1),
+		col = math.max(0, math.floor((vim.o.columns - width) / 2)),
+		width = width,
+		height = #lines,
+	}
+end
+
+function M.show_qr(lines, on_cancel)
+	vim.cmd("highlight HyperdelQr guifg=#000000 guibg=#ffffff ctermfg=Black ctermbg=White")
+	if qr_win and vim.api.nvim_win_is_valid(qr_win) then
+		local buf = vim.api.nvim_win_get_buf(qr_win)
+		vim.bo[buf].modifiable = true
+		vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+		vim.bo[buf].modifiable = false
+		vim.api.nvim_win_set_config(qr_win, qr_config(lines))
+		return
+	end
+	local buf = vim.api.nvim_create_buf(false, true)
+	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+	vim.bo[buf].modifiable = false
+	vim.bo[buf].bufhidden = "wipe"
+	local config = qr_config(lines)
+	config.style = "minimal"
+	config.zindex = 200
+	qr_win = vim.api.nvim_open_win(buf, true, config)
+	vim.wo[qr_win].winhighlight = "Normal:HyperdelQr,NormalFloat:HyperdelQr"
+	for _, key in ipairs({ "q", "<Esc>" }) do
+		vim.keymap.set("n", key, function()
+			M.close_qr()
+			on_cancel()
+		end, { buffer = buf, nowait = true })
+	end
+	M.brief("scan with Telegram on your phone: Settings > Devices > Link Desktop Device (q cancels)")
+end
+
+function M.close_qr()
+	if qr_win and vim.api.nvim_win_is_valid(qr_win) then
+		vim.api.nvim_win_close(qr_win, true)
+	end
+	qr_win = nil
+end
+
 function M.expand_hy()
 	if vim.fn.getcmdtype() == ":" and vim.fn.getcmdline():match("^[%s%d.$%%,;'<>+-]*hy$") then
 		return "Hy"

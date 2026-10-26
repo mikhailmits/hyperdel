@@ -2,7 +2,7 @@ local config = require("hyperdel.config")
 
 local M = {}
 
-local usage = "Hyperdel installed!\n\nUsage examples: hy saved -> publish the whole neovim buffer to Saved Notes\nPress leader+hy to publish to all channels or chats set in a config. (By default only saved messages are setup)"
+local usage = "Hyperdel installed!\n\nUsage examples: hy saved -> publish the whole neovim buffer to Saved Notes\nPress leader+hy to publish to all channels or chats set in a config. (By default only saved messages are setup)\n\nNote: to log in with a QR code, type qr when asked for the phone number or login code."
 
 function M.setup(opts)
 	local cfg = config.setup(opts)
@@ -46,7 +46,7 @@ function M.install_and_login(opts)
 	end
 	vim.notify(usage, vim.log.levels.INFO)
 	if opts.force then
-		return require("hyperdel.telegram").logout(M.login)
+		return require("hyperdel.telegram").forget(M.login)
 	end
 	M.login()
 end
