@@ -75,10 +75,10 @@ require("hyperdel").setup({
   },
 
   after_delivery = "keep", -- "keep" the text, "clear" it, or "close" the buffer
+  animation = true,        -- on "clear" and "close" the letters fall away first
 
-  -- runs once every target got the text; ready-made animations:
-  -- require("hyperdel.animation").collapse       with "clear": letters fall away
-  -- require("hyperdel.animation").collapse_quit  with "close": same, then quits nvim
+  -- runs after publishing and the animation, e.g. to quit nvim:
+  -- function() vim.cmd("confirm qall") end
   on_delivered = nil,
 
   keymap = "<leader>hy", -- publishes buffer or selection to all targets; false = no key

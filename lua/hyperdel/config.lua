@@ -8,6 +8,7 @@ local function defaults()
 		api_hash = os.getenv("HYPERDEL_API_HASH"),
 		targets = { saved = "saved" },
 		after_delivery = "keep",
+		animation = true,
 		on_delivered = nil,
 		keymap = "<leader>hy",
 		tdjson_path = nil,

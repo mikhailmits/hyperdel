@@ -89,10 +89,13 @@ local function render(list, width, height)
 	return lines
 end
 
-local function play(ctx, still, finish)
-	local view = ctx.view
-	if not view or #view.cells == 0 or not vim.api.nvim_win_is_valid(view.win) then
-		return finish()
+function M.play(view, bufnr, finish)
+	if #view.cells == 0 or not vim.api.nvim_win_is_valid(view.win) then
+		return finish(true)
+	end
+	local tick = vim.api.nvim_buf_get_changedtick(bufnr)
+	local function still()
+		return vim.api.nvim_buf_is_valid(bufnr) and vim.api.nvim_buf_get_changedtick(bufnr) == tick
 	end
 	local width, height = view.width, view.height
 	local list = particles(view)
@@ -127,7 +130,7 @@ local function play(ctx, still, finish)
 		if vim.api.nvim_win_is_valid(float) then
 			vim.api.nvim_win_close(float, true)
 		end
-		finish()
+		finish(still())
 	end
 	timer:start(
 		frame_ms,
@@ -151,27 +154,6 @@ local function play(ctx, still, finish)
 			vim.api.nvim_buf_set_lines(buf, 0, -1, false, render(list, width, height))
 		end)
 	)
-end
-
-function M.collapse(ctx)
-	if not ctx.cleared then
-		return
-	end
-	local tick = vim.api.nvim_buf_get_changedtick(ctx.bufnr)
-	play(ctx, function()
-		return vim.api.nvim_buf_is_valid(ctx.bufnr) and vim.api.nvim_buf_get_changedtick(ctx.bufnr) == tick
-	end, function() end)
-end
-
-function M.collapse_quit(ctx)
-	if not ctx.closed then
-		return
-	end
-	play(ctx, function()
-		return true
-	end, function()
-		vim.cmd("confirm qall")
-	end)
 end
 
 return M

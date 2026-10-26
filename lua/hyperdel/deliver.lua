@@ -1,3 +1,4 @@
+local animation = require("hyperdel.animation")
 local config = require("hyperdel.config")
 local nvim = require("hyperdel.nvim")
 local telegram = require("hyperdel.telegram")
@@ -24,20 +25,27 @@ local function view(bufnr, line1, line2)
 	}
 end
 
-local function after(cfg, bufnr, line1, line2, tick)
+local function after(cfg, bufnr, line1, line2, tick, done)
 	if cfg.after_delivery == "keep" or not vim.api.nvim_buf_is_valid(bufnr) then
-		return
+		return done()
 	end
 	if nvim.changedtick(bufnr) ~= tick then
-		return nvim.warn("buffer changed during delivery, text kept")
+		nvim.warn("buffer changed during delivery, text kept")
+		return done()
 	end
 	local shown = view(bufnr, line1, line2)
-	if cfg.after_delivery == "clear" then
-		nvim.clear(bufnr, line1, line2)
-	else
-		nvim.close(bufnr)
+	nvim.clear(bufnr, line1, line2)
+	local function finish(untouched)
+		if cfg.after_delivery == "close" and untouched and vim.api.nvim_buf_is_valid(bufnr) then
+			nvim.close(bufnr)
+			return done("close", shown)
+		end
+		done("clear", shown)
 	end
-	return cfg.after_delivery, shown
+	if cfg.animation and shown then
+		return animation.play(shown, bufnr, finish)
+	end
+	finish(true)
 end
 
 function M.deliver(opts)
@@ -74,18 +82,19 @@ function M.deliver(opts)
 			return nvim.warn(summary .. (cfg.after_delivery == "keep" and "" or ", text kept"))
 		end
 		nvim.brief(summary)
-		local done, shown = after(cfg, bufnr, line1, line2, tick)
-		if cfg.on_delivered then
-			cfg.on_delivered({
-				targets = delivered,
-				bufnr = bufnr,
-				text = text,
-				line1 = line1,
-				cleared = done == "clear",
-				closed = done == "close",
-				view = shown,
-			})
-		end
+		after(cfg, bufnr, line1, line2, tick, function(done, shown)
+			if cfg.on_delivered then
+				cfg.on_delivered({
+					targets = delivered,
+					bufnr = bufnr,
+					text = text,
+					line1 = line1,
+					cleared = done == "clear",
+					closed = done == "close",
+					view = shown,
+				})
+			end
+		end)
 	end
 
 	local function deliver_to(i)
