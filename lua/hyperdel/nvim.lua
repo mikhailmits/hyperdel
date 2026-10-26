@@ -30,6 +30,13 @@ function M.brief(msg)
 	vim.notify(msg, vim.log.levels.INFO)
 end
 
+function M.expand_hy()
+	if vim.fn.getcmdtype() == ":" and vim.fn.getcmdline():match("^[%s%d.$%%,;'<>+-]*hy$") then
+		return "Hy"
+	end
+	return "hy"
+end
+
 function M.input(prompt, cb)
 	vim.ui.input({ prompt = prompt }, function(value)
 		if value and vim.fn.histget("@", -1) == value then

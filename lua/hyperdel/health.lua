@@ -45,7 +45,7 @@ function M.check()
 	local client = require("hyperdel.tdlib.client")
 	local loaded, err = client.load(cfg.tdjson_path)
 	if not loaded then
-		fail(err, { "run :HyperdelInstall, or set tdjson_path in setup()" })
+		fail(err, { "run :HyperdelSetup, or set tdjson_path in setup()" })
 	else
 		local path = require("hyperdel.tdlib.library").path
 		local option = client.execute({ ["@type"] = "getOption", name = "version" })
@@ -61,7 +61,7 @@ function M.check()
 
 	local names = vim.tbl_keys(cfg.targets)
 	table.sort(names)
-	info("targets: " .. table.concat(names, ", ") .. " (default: " .. cfg.default_target .. ")")
+	info("targets: " .. table.concat(names, ", "))
 	info("session: " .. (require("hyperdel.telegram").state() or "not started"))
 end
 

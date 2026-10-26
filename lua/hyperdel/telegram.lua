@@ -19,6 +19,7 @@ local early = {}
 local options = {}
 local chat_ids = {}
 local prompts = {}
+local after_logout = {}
 
 local function is_error(obj)
 	return obj["@type"] == "error"
@@ -110,6 +111,15 @@ local function log_out()
 	client.send({ ["@type"] = "logOut" })
 end
 
+local function logged_out(msg)
+	nvim.notify(msg)
+	local list = after_logout
+	after_logout = {}
+	for _, cb in ipairs(list) do
+		cb()
+	end
+end
+
 local function on_auth_state(update)
 	state = update.authorization_state["@type"]
 	if state == "authorizationStateWaitTdlibParameters" then
@@ -123,19 +133,21 @@ local function on_auth_state(update)
 		client.reset()
 		state = nil
 		chat_ids = {}
-		if intent == "logging_out" then
-			nvim.notify("logged out")
-		end
+		local was = intent
 		intent = nil
 		fail_pending("telegram client closed")
-		return flush("telegram client closed")
+		flush("telegram client closed")
+		if was == "logging_out" then
+			logged_out("logged out")
+		end
+		return
 	elseif state == "authorizationStateLoggingOut" or state == "authorizationStateClosing" then
 		return
 	end
 	if intent == "logout" then
 		intent = nil
-		nvim.notify("not logged in")
-		return flush("not logged in")
+		flush("not logged in")
+		return logged_out("not logged in")
 	end
 	if not prompts[state] then
 		return flush("unsupported login step " .. state)
@@ -309,6 +321,10 @@ local function send_text(chat_id, text, cb)
 	end, timeouts.offline)
 end
 
+function M.ready(cb)
+	when_ready(cb)
+end
+
 function M.text_limit()
 	return tonumber(options.message_text_length_max) or 4096
 end
@@ -361,7 +377,10 @@ function M.login(cb)
 	end)
 end
 
-function M.logout()
+function M.logout(cb)
+	if cb then
+		table.insert(after_logout, cb)
+	end
 	if client.running() then
 		if state == "authorizationStateReady" then
 			return log_out()
@@ -369,7 +388,7 @@ function M.logout()
 			intent = "logging_out"
 			return
 		elseif prompts[state] then
-			return nvim.notify("not logged in")
+			return logged_out("not logged in")
 		end
 	end
 	intent = "logout"
@@ -377,6 +396,7 @@ function M.logout()
 		local ok, err = start()
 		if not ok then
 			intent = nil
+			after_logout = {}
 			nvim.error(err)
 		end
 	end

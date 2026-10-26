@@ -53,7 +53,7 @@ function M.load(path)
 		end
 		table.insert(errors, candidate .. ": " .. tostring(loaded))
 	end
-	return nil, "tdjson library not found, run :HyperdelInstall or set tdjson_path\n" .. table.concat(errors, "\n")
+	return nil, "tdjson library not found, run :HyperdelSetup or set tdjson_path\n" .. table.concat(errors, "\n")
 end
 
 return M

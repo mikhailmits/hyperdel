@@ -46,32 +46,69 @@ function M.deliver(opts)
 	local bufnr = opts.bufnr or vim.api.nvim_get_current_buf()
 	local line1 = opts.line1 or 1
 	local line2 = opts.line2 or vim.api.nvim_buf_line_count(bufnr)
-	local name, target = config.resolve_target(opts.target)
+	local targets = config.resolve_targets(opts.targets)
+	if #targets == 0 then
+		return nvim.warn("no targets configured")
+	end
 	local text = nvim.get_text(bufnr, line1, line2)
 	if not text:match("%S") then
 		return nvim.warn("nothing to deliver")
 	end
 	local tick = nvim.changedtick(bufnr)
-	telegram.deliver(target, text, function(err, sent)
-		if err then
-			local partial = sent and sent > 0 and string.format(" after %d message(s)", sent) or ""
-			return nvim.error("delivery to " .. name .. " failed" .. partial .. ": " .. err)
+	local delivered, errors = {}, {}
+
+	local function report()
+		for _, err in ipairs(errors) do
+			nvim.error(err)
 		end
-		nvim.brief(string.format("delivered to %s (%d message%s)", name, sent, sent == 1 and "" or "s"))
+		if #delivered == 0 then
+			return
+		end
+		local names = vim.tbl_map(function(d)
+			return d.name
+		end, delivered)
+		local sent = delivered[1].messages
+		local summary =
+			string.format("delivered to %s (%d message%s)", table.concat(names, ", "), sent, sent == 1 and "" or "s")
+		if #errors > 0 then
+			return nvim.warn(summary .. (cfg.after_delivery == "keep" and "" or ", text kept"))
+		end
+		nvim.brief(summary)
 		local done, shown = after(cfg, bufnr, line1, line2, tick)
 		if cfg.on_delivered then
 			cfg.on_delivered({
-				target = name,
-				chat = target,
+				targets = delivered,
 				bufnr = bufnr,
 				text = text,
-				messages = sent,
 				line1 = line1,
 				cleared = done == "clear",
 				closed = done == "close",
 				view = shown,
 			})
 		end
+	end
+
+	local function deliver_to(i)
+		local t = targets[i]
+		if not t then
+			return report()
+		end
+		telegram.deliver(t.chat, text, function(err, sent)
+			if err then
+				local partial = sent and sent > 0 and string.format(" after %d message(s)", sent) or ""
+				table.insert(errors, "delivery to " .. t.name .. " failed" .. partial .. ": " .. err)
+			else
+				table.insert(delivered, { name = t.name, chat = t.chat, messages = sent })
+			end
+			deliver_to(i + 1)
+		end)
+	end
+
+	telegram.ready(function(err)
+		if err then
+			return nvim.error("delivery failed: " .. err)
+		end
+		deliver_to(1)
 	end)
 end
 
