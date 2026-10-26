@@ -23,8 +23,8 @@ You may configure the `hy <target>` targets in order to specify where to publish
 {
   "mikhailmits/hyperdel",
   opts = {
-    api_id = 12345,
-    api_hash = "your_api_hash",
+    api_id = "replace me",
+    api_hash = "replace me",
   },
 }
 ```
